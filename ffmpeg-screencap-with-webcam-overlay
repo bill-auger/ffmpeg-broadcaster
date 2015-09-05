@@ -23,16 +23,19 @@ WEBCAM_INPUT="-f v4l2 -i /dev/video0"
 #   Insert a transparent PNG logo in the bottom left corner of the input,
 #       using the ffmpeg tool with the "-filter_complex" option:
 #       $ ffmpeg -i input -i logo -filter_complex 'overlay=10:main_h-overlay_h-10' output
-# $OVERLAY="-i me.png -filter_complex \"overlay=W-w-8:y=8:format=yuv444\""
-# $OVERLAY="-i me.png -filter_complex \"overlay=W-w-8:y=8:format=rgb\""
-$OVERLAY="-i 'me.png' -filter_complex 'overlay=10:main_h-overlay_h-10'"
-# $OVERLAY="-i me.png -lavfi \"overlay=W-w-8:y=8:format=rgb\""
-# $OVERLAY="-vf \"movie=me.png [watermark]; [in][watermark] overlay=10:10 [out]\""
-# $OVERLAY=-vf "drawtext=text=this is a \\\\\\'string\\\\\\'\\\\: may contain one\\, or more\\, special characters"
-# $OVERLAY=-vf "drawbox=x=10:y=10:w=100:h=100:color=pink@0.5:t=max"
-# $OVERLAY=-vf "drawtext=text=this is some text"
-# $OVERLAY=-vf "color=color=red@.3:size=WxH [over]; [in][over] overlay [out]"
+# TEST_OVERLAY="-i me.png -filter_complex \"overlay=W-w-8:y=8:format=yuv444\""
+# TEST_OVERLAY="-i me.png -filter_complex \"overlay=W-w-8:y=8:format=rgb\""
+TEST_OVERLAY="-i 'me.png' -filter_complex 'overlay=10:main_h-overlay_h-10'"
+# TEST_OVERLAY="-i me.png -lavfi \"overlay=W-w-8:y=8:format=rgb\""
+# TEST_OVERLAY="-vf \"movie=me.png [watermark]; [in][watermark] overlay=10:10 [out]\""
+# TEST_OVERLAY=-vf "drawtext=text=this is a \\\\\\'string\\\\\\'\\\\: may contain one\\, or more\\, special characters"
+# TEST_OVERLAY=-vf "drawbox=x=10:y=10:w=100:h=100:color=pink@0.5:t=max"
+# TEST_OVERLAY=-vf "drawtext=text=this is some text"
+# TEST_OVERLAY=-vf "color=color=red@.3:size=WxH [over]; [in][over] overlay [out]"
 # AUDIO_INPUT="-f alsa -i hw:0"
+MAIN_INPUT=$SCREENCAP_INPUT
+# OVERLAY_INPUT=$TEST_OVERLAY
+OVERLAY_INPUT=
 AUDIO_INPUT="-f jack -i ffmpeg"
 STREAM_OUTPUT="-f flv -ac 2 -ar $AUDIO_RATE -vcodec libx264 -keyint_min 3 \
                -b:v $CBR -minrate $CBR -maxrate $CBR -pix_fmt yuv420p     \
@@ -42,9 +45,12 @@ RTMP_URL="rtmp://usmedia3.livecoding.tv:1935/livecodingtv/$LIVECODING_STREAM_KEY
 # RTMP_URL=test.mp4
 
 
-ffmpeg $SCREENCAP_INPUT        \
-       $OVERLAY                \
-       $AUDIO_INPUT            \
-       $STREAM_OUTPUT          \
-       $THREADS                \
+# ffmpeg $MAIN_INPUT    \
+#        $OVERLAY_INPUT \
+ffmpeg -i 'me.png'                                      \
+       -f x11grab -s "$INRES" -r "$FPS" -i :0.0         \
+       -filter_complex 'overlay=10:main_h-overlay_h-10' \
+       $AUDIO_INPUT   \
+       $STREAM_OUTPUT \
+       $THREADS       \
        $RTMP_URL
