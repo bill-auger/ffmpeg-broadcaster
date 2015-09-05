@@ -19,29 +19,23 @@ HIDE_LOGS=""
 # ffmpeg params
 SCREENCAP_INPUT="-f x11grab -s "$INRES" -r "$FPS" -i :0.0"
 WEBCAM_INPUT="-f v4l2 -i /dev/video0"
-STATIC_INPUT="-i me.png"
-MAIN_INPUT=$SCREENCAP_INPUT
-# MAIN_INPUT=$STATIC_INPUT
-# MAIN_INPUT=$WEBCAM_INPUT
-# OVERLAY_INPUT=$SCREENCAP_INPUT
-# OVERLAY_INPUT=$STATIC_INPUT
-OVERLAY_INPUT=$WEBCAM_INPUT
-# OVERLAY_INPUT=
 # from man ffmpeg-filters:
 #   Insert a transparent PNG logo in the bottom left corner of the input,
 #       using the ffmpeg tool with the "-filter_complex" option:
 #       $ ffmpeg -i input -i logo -filter_complex 'overlay=10:main_h-overlay_h-10' output
-# OVERLAY_FILTER="-filter_complex \"overlay=W-w-8:y=8:format=yuv444\""
-# OVERLAY_FILTER="-filter_complex \"overlay=W-w-8:y=8:format=rgb\""
-OVERLAY_FILTER=-filter_complex 'overlay=10:main_h-overlay_h-10'
-# OVERLAY_FILTER="-lavfi \"overlay=W-w-8:y=8:format=rgb\""
-# OVERLAY_FILTER="-vf \"movie=me.png [watermark]; [in][watermark] overlay=10:10 [out]\""
-# OVERLAY_FILTER=-vf "drawtext=text=this is a \\\\\\'string\\\\\\'\\\\: may contain one\\, or more\\, special characters"
-# OVERLAY_FILTER=-vf "drawbox=x=10:y=10:w=100:h=100:color=pink@0.5:t=max"
-# OVERLAY_FILTER=-vf "drawtext=text=this is some text"
-# OVERLAY_FILTER=-vf "color=color=red@.3:size=WxH [over]; [in][over] overlay [out]"
-# OVERLAY_FILTER=
+# TEST_OVERLAY="-i me.png -filter_complex \"overlay=W-w-8:y=8:format=yuv444\""
+# TEST_OVERLAY="-i me.png -filter_complex \"overlay=W-w-8:y=8:format=rgb\""
+TEST_OVERLAY="-i 'me.png' -filter_complex 'overlay=10:main_h-overlay_h-10'"
+# TEST_OVERLAY="-i me.png -lavfi \"overlay=W-w-8:y=8:format=rgb\""
+# TEST_OVERLAY="-vf \"movie=me.png [watermark]; [in][watermark] overlay=10:10 [out]\""
+# TEST_OVERLAY=-vf "drawtext=text=this is a \\\\\\'string\\\\\\'\\\\: may contain one\\, or more\\, special characters"
+# TEST_OVERLAY=-vf "drawbox=x=10:y=10:w=100:h=100:color=pink@0.5:t=max"
+# TEST_OVERLAY=-vf "drawtext=text=this is some text"
+# TEST_OVERLAY=-vf "color=color=red@.3:size=WxH [over]; [in][over] overlay [out]"
 # AUDIO_INPUT="-f alsa -i hw:0"
+MAIN_INPUT=$SCREENCAP_INPUT
+# OVERLAY_INPUT=$TEST_OVERLAY
+OVERLAY_INPUT=
 AUDIO_INPUT="-f jack -i ffmpeg"
 STREAM_OUTPUT="-f flv -ac 2 -ar $AUDIO_RATE -vcodec libx264 -keyint_min 3 \
                -b:v $CBR -minrate $CBR -maxrate $CBR -pix_fmt yuv420p     \
@@ -50,13 +44,13 @@ THREADS="-threads $THREADS $HIDE_LOGS"
 RTMP_URL="rtmp://usmedia3.livecoding.tv:1935/livecodingtv/$LIVECODING_STREAM_KEY"
 # RTMP_URL=test.mp4
 
-
-echo "\$ ffmpeg $MAIN_INPUT $OVERLAY_INPUT $OVERLAY_FILTER $AUDIO_INPUT $STREAM_OUTPUT $THREADS $RTMP_URL"
-
-ffmpeg -f x11grab -s "$INRES" -r "$FPS" -i :0.0 \
-       -f v4l2 -i /dev/video0  \
+echo "\$ ffmpeg -f v4l2 -i /dev/video0 -f x11grab -s "$INRES" -r "$FPS" -i :0.0 -filter_complex 'overlay=10:main_h-overlay_h-10' $AUDIO_INPUT $STREAM_OUTPUT $THREADS $RTMP_URL"
+# ffmpeg $MAIN_INPUT    \
+#        $OVERLAY_INPUT \
+ffmpeg -f v4l2 -i /dev/video0                           \
+       -f x11grab -s "$INRES" -r "$FPS" -i :0.0         \
        -filter_complex 'overlay=10:main_h-overlay_h-10' \
-       $AUDIO_INPUT    \
-       $STREAM_OUTPUT  \
-       $THREADS        \
+       $AUDIO_INPUT   \
+       $STREAM_OUTPUT \
+       $THREADS       \
        $RTMP_URL
