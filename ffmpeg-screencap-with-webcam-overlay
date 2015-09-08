@@ -2,24 +2,26 @@
 
 
 # user params
-INRES="1280x800"            # input resolution
-OUTRES="768x480"            # output resolution
-FPS="15"                    # target FPS
-GOP="30"                    # i-frame interval, should be double of FPS,
-GOPMIN="15"                 # min i-frame interval, should be equal to fps,
-THREADS="2"                 # max 6
-CBR="800k"                  # constant bitrate (should be between 1000k - 3000k)
-QUALITY="veryfast"          # one of the many FFMPEG preset
-AUDIO_RATE="44100"          # audio bitrate (44100 is fine)
 STREAM_KEY=""               # your streaming key goes here
+SCREEN_N=":0.0"             # display/desktop number to capture (first is :0.0)
+CAM_DEV=/dev/video0         # video device to grab (first is /dev/video0)
+SCREEN_RES="1280x800"       # desktop input resolution
+CAM_RES="160x120"           # webcam input/output resolution
+STREAM_RES="768x480"        # mix output resolution
+FPS="12"                    # target output FPS
+AUDIO_RATE="22050"          # audio bitrate (22050 is plenty for voice)
+CBR="800k"                  # constant output bitrate (should be between 1000k - 3000k)
+GOP_MIN="$FPS"              # min i-frame interval, should be equal to fps  (TODO: unused)
+GOP_MAX="$(($FPS*2))"       # max i-frame interval, should be double of FPS (TODO: unused)
+THREADS="2"                 # max 6
+QUALITY="veryfast"          # one of the many FFMPEG preset
 HIDE_LOGS="-loglevel quiet" # to hide logs
-HIDE_LOGS=""
-
+HIDE_LOGS=""                # to show logs
 
 # ffmpeg params
-SCREENCAP_INPUT="-f x11grab -s "$INRES" -r "$FPS" -i :0.0"
+SCREENCAP_INPUT="-f x11grab -s "$SCREEN_RES" -r "$FPS" -i $SCREEN_N"
 # WEBCAM_INPUT="-f v4l2 -i /dev/video0"
-WEBCAM_INPUT="-f v4l2 -video_size 160x120 -framerate 30 -i /dev/video0"
+WEBCAM_INPUT="-f v4l2 -s $CAM_RES -r $FPS -i $CAM_DEV"
 # 640x480 352x288 320x240 176x144 160x120
 STATIC_INPUT="-i me.png"
 MAIN_INPUT=$SCREENCAP_INPUT
@@ -33,9 +35,9 @@ OVERLAY_INPUT=$WEBCAM_INPUT
 #   Insert a transparent PNG logo in the bottom left corner of the input,
 #       using the ffmpeg tool with the "-filter_complex" option:
 #       $ ffmpeg -i input -i logo -filter_complex 'overlay=10:main_h-overlay_h-10' output
+# OVERLAY_FILTER="-filter_complex 'overlay=10:main_h-overlay_h-10'"
 # OVERLAY_FILTER="-filter_complex \"overlay=W-w-8:y=8:format=yuv444\""
 # OVERLAY_FILTER="-filter_complex \"overlay=W-w-8:y=8:format=rgb\""
-OVERLAY_FILTER=-filter_complex 'overlay=10:main_h-overlay_h-10'
 # OVERLAY_FILTER="-lavfi \"overlay=W-w-8:y=8:format=rgb\""
 # OVERLAY_FILTER="-vf \"movie=me.png [watermark]; [in][watermark] overlay=10:10 [out]\""
 # OVERLAY_FILTER=-vf "drawtext=text=this is a \\\\\\'string\\\\\\'\\\\: may contain one\\, or more\\, special characters"
@@ -47,7 +49,7 @@ OVERLAY_FILTER=-filter_complex 'overlay=10:main_h-overlay_h-10'
 AUDIO_INPUT="-f jack -i ffmpeg"
 STREAM_OUTPUT="-f flv -ac 2 -ar $AUDIO_RATE -vcodec libx264 -keyint_min 3 \
                -b:v $CBR -minrate $CBR -maxrate $CBR -pix_fmt yuv420p     \
-               -s $OUTRES -preset $QUALITY -acodec mp3 -bufsize $CBR"
+               -s $STREAM_RES -preset $QUALITY -acodec mp3 -bufsize $CBR"
 THREADS="-threads $THREADS $HIDE_LOGS"
 RTMP_URL="rtmp://usmedia3.livecoding.tv:1935/livecodingtv/$LIVECODING_STREAM_KEY"
 # RTMP_URL=test.mp4
@@ -56,10 +58,16 @@ RTMP_URL="rtmp://usmedia3.livecoding.tv:1935/livecodingtv/$LIVECODING_STREAM_KEY
 echo "\$ ffmpeg $MAIN_INPUT $OVERLAY_INPUT $OVERLAY_FILTER $AUDIO_INPUT $STREAM_OUTPUT $THREADS $RTMP_URL"
 
 #        $OVERLAY_FILTER \ # TODO: nfg
-ffmpeg $MAIN_INPUT     \
-       $OVERLAY_INPUT  \
+ffmpeg $MAIN_INPUT                                                 \
+       $OVERLAY_INPUT                                              \
        -filter_complex 'overlay=main_w-overlay_w:main_h-overlay_h' \
-       $AUDIO_INPUT    \
-       $STREAM_OUTPUT  \
-       $THREADS        \
+       $AUDIO_INPUT                                                \
+       $STREAM_OUTPUT                                              \
+       $THREADS                                                    \
        $RTMP_URL
+
+
+# TODO: can not re-center programatically
+#        -filter_complex 'overlay=main_w-overlay_w:main_h-overlay_h,drawtext=fontfile=/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans-Bold.ttf: text='`date | tr " " "-"`': fontcolor=white@1.0: x=main_w/2-text_w/2: y=main_h-48: fontsize=48' \
+# moving text
+#        -filter_complex "overlay=main_w-overlay_w:main_h-overlay_h,drawtext=fontfile=/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans.ttf: text=`date`:fontcolor=white:fontsize=74:box=1:boxcolor=red:x=if(eq(mod(n\,18)\,0)\,sin(random(1))*w\,x):y=if(eq(mod(n\,18)\,0)\,sin(random(1))*h\,y)" \
