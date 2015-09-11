@@ -1,6 +1,9 @@
 #!/bin/bash
 
 
+AUDIO_BITRATE="128k"
+
+
 # user params
 STREAM_KEY=""               # your streaming key goes here
 SCREEN_N=":0.0"             # display/desktop number to capture (first is :0.0)
@@ -9,65 +12,52 @@ SCREEN_RES="1280x800"       # desktop input resolution
 CAM_RES="160x120"           # webcam input/output resolution
 STREAM_RES="768x480"        # mix output resolution
 FPS="12"                    # target output FPS
-AUDIO_RATE="22050"          # audio bitrate (22050 is plenty for voice)
+AUDIO_SAMPLERATE="22050"    # audio bitrate (22050 is plenty for voice)
 CBR="800k"                  # constant output bitrate (should be between 1000k - 3000k)
 GOP_MIN="$FPS"              # min i-frame interval, should be equal to fps  (TODO: unused)
 GOP_MAX="$(($FPS*2))"       # max i-frame interval, should be double of FPS (TODO: unused)
 THREADS="2"                 # max 6
 QUALITY="veryfast"          # one of the many FFMPEG preset
-HIDE_LOGS="-loglevel quiet" # to hide logs
-HIDE_LOGS=""                # to show logs
+QUALITY="ultrafast"          # one of the many FFMPEG preset
+HIDE_LOGS="-loglevel quiet" # no console output
+# HIDE_LOGS="-loglevel error" # fatal errors console output
+# HIDE_LOGS=""                # verbose console output
 
 # ffmpeg params
 SCREENCAP_INPUT="-f x11grab -s "$SCREEN_RES" -r "$FPS" -i $SCREEN_N"
-# WEBCAM_INPUT="-f v4l2 -i /dev/video0"
+SDP_INPUT="-i /code/vlc-screen.sdp"
 WEBCAM_INPUT="-f v4l2 -s $CAM_RES -r $FPS -i $CAM_DEV"
-# 640x480 352x288 320x240 176x144 160x120
 STATIC_INPUT="-i me.png"
 MAIN_INPUT=$SCREENCAP_INPUT
-# MAIN_INPUT=$STATIC_INPUT
+# MAIN_INPUT=$SDP_INPUT
 # MAIN_INPUT=$WEBCAM_INPUT
+# MAIN_INPUT=$STATIC_INPUT
 # OVERLAY_INPUT=$SCREENCAP_INPUT
 # OVERLAY_INPUT=$STATIC_INPUT
 OVERLAY_INPUT=$WEBCAM_INPUT
 # OVERLAY_INPUT=
-# from man ffmpeg-filters:
-#   Insert a transparent PNG logo in the bottom left corner of the input,
-#       using the ffmpeg tool with the "-filter_complex" option:
-#       $ ffmpeg -i input -i logo -filter_complex 'overlay=10:main_h-overlay_h-10' output
 # OVERLAY_FILTER="-filter_complex 'overlay=10:main_h-overlay_h-10'"
-# OVERLAY_FILTER="-filter_complex \"overlay=W-w-8:y=8:format=yuv444\""
-# OVERLAY_FILTER="-filter_complex \"overlay=W-w-8:y=8:format=rgb\""
-# OVERLAY_FILTER="-lavfi \"overlay=W-w-8:y=8:format=rgb\""
-# OVERLAY_FILTER="-vf \"movie=me.png [watermark]; [in][watermark] overlay=10:10 [out]\""
-# OVERLAY_FILTER=-vf "drawtext=text=this is a \\\\\\'string\\\\\\'\\\\: may contain one\\, or more\\, special characters"
-# OVERLAY_FILTER=-vf "drawbox=x=10:y=10:w=100:h=100:color=pink@0.5:t=max"
-# OVERLAY_FILTER=-vf "drawtext=text=this is some text"
-# OVERLAY_FILTER=-vf "color=color=red@.3:size=WxH [over]; [in][over] overlay [out]"
 # OVERLAY_FILTER=
-# AUDIO_INPUT="-f alsa -i hw:0"
-AUDIO_INPUT="-f jack -i ffmpeg"
-STREAM_OUTPUT="-f flv -ac 2 -ar $AUDIO_RATE -vcodec libx264 -keyint_min 3 \
-               -b:v $CBR -minrate $CBR -maxrate $CBR -pix_fmt yuv420p     \
-               -s $STREAM_RES -preset $QUALITY -acodec mp3 -bufsize $CBR"
+ALSA_INPUT="-f alsa -i hw:0"
+PULSE_INPUT="-f pulse -name ffmpeg -sample_rate $AUDIO_SAMPLERATE -i default"
+JACK_INPUT="-f jack -i ffmpeg"
+# AUDIO_INPUT=$ALSA_INPUT
+# AUDIO_INPUT=$PULSE_INPUT
+AUDIO_INPUT=$JACK_INPUT
+STREAM_OUTPUT="-f flv -ac 2 -ar $AUDIO_SAMPLERATE -vcodec libx264 -keyint_min 60 \
+               -b:v $CBR -minrate $CBR -maxrate $CBR -pix_fmt yuv420p            \
+               -s $STREAM_RES -preset $QUALITY -acodec libfaac -bufsize $CBR"
 THREADS="-threads $THREADS $HIDE_LOGS"
 RTMP_URL="rtmp://usmedia3.livecoding.tv:1935/livecodingtv/$LIVECODING_STREAM_KEY"
-# RTMP_URL=test.mp4
+DUMP_FILE=/code/livecoding.mp4
+DEST=$RTMP_URL
+# DEST=$DUMP_FILE
 
 
-echo "\$ ffmpeg $MAIN_INPUT $OVERLAY_INPUT $OVERLAY_FILTER $AUDIO_INPUT $STREAM_OUTPUT $THREADS $RTMP_URL"
-
-#        $OVERLAY_FILTER \ # TODO: nfg
-ffmpeg $MAIN_INPUT                                                 \
-       $OVERLAY_INPUT                                              \
-       -filter_complex 'overlay=main_w-overlay_w:main_h-overlay_h' \
-       $AUDIO_INPUT                                                \
-       $STREAM_OUTPUT                                              \
-       $THREADS                                                    \
-       $RTMP_URL
-
-
-# TODO: can not re-center programatically
-#        -filter_complex 'overlay=main_w-overlay_w:main_h-overlay_h,drawtext=fontfile=/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans-Bold.ttf: text='`date | tr " " "-"`': fontcolor=white@1.0: x=main_w/2-text_w/2: y=main_h-48: fontsize=48' \
-# moving text
-#        -filter_complex "overlay=main_w-overlay_w:main_h-overlay_h,drawtext=fontfile=/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans.ttf: text=`date`:fontcolor=white:fontsize=74:box=1:boxcolor=red:x=if(eq(mod(n\,18)\,0)\,sin(random(1))*w\,x):y=if(eq(mod(n\,18)\,0)\,sin(random(1))*h\,y)" \
+avconv -s $CAM_RES -f video4linux2 -i $CAM_DEV                                     \
+       -f x11grab -r $FPS -s $SCREEN_RES -i $SCREEN_N                              \
+       -filter_complex "[1:0][0:0]overlay=main_w-overlay_w:main_h-overlay_h"       \
+       -f jack -i avconv                                                           \
+       -vcodec libx264 -pre:0 $QUALITY -g 45 -vb $CBR -maxrate $CBR -bufsize 1200k \
+       -acodec aac -ar $AUDIO_SAMPLERATE -ab $AUDIO_BITRATE -strict experimental   \
+       -f flv $DEST
