@@ -1,84 +1,135 @@
 #!/bin/bash
 
 
-
-
 # user params
-STREAM_KEY=""               # your streaming key goes here
-SCREEN_N=":0.0"             # display/desktop number to capture (first is :0.0)
-CAM_DEV=/dev/video0         # video device to grab (first is /dev/video0)
-SCREEN_RES="1280x800"       # desktop input resolution
-CAM_RES="160x120"           # webcam input/output resolution
-STREAM_RES="768x480"        # mix output resolution
-FPS="12"                    # target output FPS
-AUDIO_CHANNELS="2"          # number of channels
-AUDIO_SAMPLERATE="22050"    # audio samplerate (22050 is plenty for voice)
-AUDIO_BITRATE="128k"        # audio bitrate (64k per channel is plenty for voice)
-CBR="800k"                  # constant output bitrate (should be between 1000k - 3000k)
-GOP_MIN="$FPS"              # min i-frame interval, should be equal to fps  (TODO: unused)
-GOP_MAX="$(($FPS*2))"       # max i-frame interval, should be double of FPS (TODO: unused)
-THREADS="2"                 # max 6
-QUALITY="veryfast"          # one of the many FFMPEG preset
-QUALITY="ultrafast"          # one of the many FFMPEG preset
-HIDE_LOGS="-loglevel quiet" # no console output
-# HIDE_LOGS="-loglevel error" # fatal errors console output
-# HIDE_LOGS=""                # verbose console output
+STREAM_KEY=""                    # your streaming key goes here (or define LIVECODING_STREAM_KEY in env)
+SCREEN_W=1280                    # input screen width (e.g. desktop width)
+SCREEN_H=800                     # input screen height (e.g. desktop height)
+SCREEN_RES=$SCREEN_W'x'$SCREEN_H # desktop input resolution
+SCREEN_N=":0.0"                  # display/desktop number to capture (first is :0.0)
+CAM_W=160                        # input screen width (e.g. desktop width)
+CAM_H=120                        # input screen height (e.g. desktop height)
+CAM_RES=$CAM_W'x'$CAM_H          # webcam input/output resolution
+CAM_DEV=/dev/video0              # video device to grab (first is /dev/video0)
+STREAM_W=768                     # input screen width (e.g. desktop width)
+STREAM_H=480                     # input screen height (e.g. desktop height)
+STREAM_RES=$STREAM_W'x'$STREAM_H # mix output resolution
+FPS="12"                         # target output FPS
+CBR="800k"                       # constant output bitrate (should be between 1000k - 3000k)
+GOP="$(($FPS*4))"                # i-frame interval
+AUDIO_CHANNELS="2"               # number of channels
+AUDIO_SAMPLERATE="22050"         # audio samplerate (22050 is plenty for voice)
+AUDIO_BITRATE="128k"             # audio bitrate (64k per channel is plenty for voice)
+THREADS="0"                      # 0 for auto - max 6
+QUALITY="ultrafast"              # one of the many FFMPEG preset
+LOGGING="-loglevel quiet"        # console output
+# LOGGING="-loglevel error"      # fatal errors console output
+# LOGGING=""                     # verbose console output
 
 # ffmpeg params
 SCREENCAP_INPUT="-f x11grab -s "$SCREEN_RES" -r "$FPS" -i $SCREEN_N"
-SDP_INPUT="-i /code/vlc-screen.sdp"
-WEBCAM_INPUT="-f v4l2 -s $CAM_RES -r $FPS -i $CAM_DEV"
-STATIC_INPUT="-f image2 -i ~/dl/me-sm.jpeg"
-MAIN_INPUT=$SCREENCAP_INPUT
-# MAIN_INPUT=$SDP_INPUT
-# MAIN_INPUT=$WEBCAM_INPUT
-# MAIN_INPUT=$STATIC_INPUT
-# OVERLAY_INPUT=$SCREENCAP_INPUT
-# OVERLAY_INPUT=$STATIC_INPUT
-OVERLAY_INPUT=$WEBCAM_INPUT
-# OVERLAY_INPUT=
-# OVERLAY_FILTER="-filter_complex 'overlay=10:main_h-overlay_h-10'"
-# OVERLAY_FILTER=
-ALSA_INPUT="-f alsa -i hw:0"
-PULSE_INPUT="-f pulse -name ffmpeg -sample_rate $AUDIO_SAMPLERATE -i default"
+WEBCAM_INPUT="-f video4linux2 -s $CAM_RES -i $CAM_DEV"
+SDP_INPUT="-i /code/vlc-screen.sdp"                                           # unused
+STATIC_INPUT="-f image2 -i ~/dl/me-sm.jpeg"                                   # unused
+ALSA_INPUT="-f alsa -i hw:0"                                                  # unused
+PULSE_INPUT="-f pulse -name ffmpeg -sample_rate $AUDIO_SAMPLERATE -i default" # unused
 JACK_INPUT="-f jack -i ffmpeg"
-# AUDIO_INPUT=$ALSA_INPUT
-# AUDIO_INPUT=$PULSE_INPUT
-AUDIO_INPUT=$JACK_INPUT
-STREAM_OUTPUT="-f flv -ac $AUDIO_CHANNELS -ar $AUDIO_SAMPLERATE -vcodec libx264 -keyint_min 60 \
-               -b:v $CBR -minrate $CBR -maxrate $CBR -pix_fmt yuv420p            \
-               -s $STREAM_RES -preset $QUALITY -acodec libfaac -bufsize $CBR"
-THREADS="-threads $THREADS $HIDE_LOGS"
+OVERLAY_TL_POS="0: 0"                                                         # unused
+OVERLAY_BR_POS="main_w-overlay_w: main_h-overlay_h"
+X264_OUUTPUT="-vcodec libx264 -preset $QUALITY -s $STREAM_RES -g $GOP -vb $CBR -maxrate $CBR -bufsize $CBR"
+AAC_OUTPUT="-acodec aac -ar $AUDIO_SAMPLERATE -ab $AUDIO_BITRATE -strict experimental"
+THREADS="-threads $THREADS"
+[ $LIVECODING_STREAM_KEY ] || LIVECODING_STREAM_KEY=$STREAM_KEY
 RTMP_URL="rtmp://usmedia3.livecoding.tv:1935/livecodingtv/$LIVECODING_STREAM_KEY"
 DUMP_FILE=/code/livecoding.mp4
-DEST=$RTMP_URL
-DEST=$DUMP_FILE
+FILE_OUTPUT="-f flv $DUMP_FILE"
+LIVE_OUTPUT="-f flv $RTMP_URL"
+
+# user selections
+MAIN_INPUT=$SCREENCAP_INPUT
+OVERLAY_INPUT=$WEBCAM_INPUT
+OVERLAY_POS=$OVERLAY_BR_POS
+AUDIO_INPUT=$JACK_INPUT
+VIDEO_OUTPUT=$X264_OUUTPUT
+AUDIO_OUTPUT=$AAC_OUTPUT
+STREAM_OUTPUT=$LIVE_OUTPUT
 
 
-loop()
+screenPlusCam()
 {
-  avconv -s $CAM_RES -f video4linux2 -i $CAM_DEV                                     \
-         -f x11grab -r $FPS -s $SCREEN_RES -i $SCREEN_N                              \
-         -filter_complex "[1:0][0:0]overlay=main_w-overlay_w:main_h-overlay_h"       \
-         -f jack -i avconv                                                           \
-         -vcodec libx264 -pre:0 $QUALITY -g 45 -vb $CBR -maxrate $CBR -bufsize 1200k \
-         -acodec aac -ar $AUDIO_SAMPLERATE -ab $AUDIO_BITRATE -strict experimental   \
-         -f flv $DEST
+  avconv $MAIN_INPUT                           \
+         $OVERLAY_INPUT                        \
+        -filter_complex overlay="$OVERLAY_POS" \
+         $AUDIO_INPUT                          \
+         $VIDEO_OUTPUT                         \
+         $AUDIO_OUTPUT                         \
+         $THREADS                              \
+         $LOGGING                              \
+         $STREAM_OUTPUT
 }
 
-textOverlay()
+screenPlusText()
 {
-  avconv -s $CAM_RES -f video4linux2 -i $CAM_DEV                                     \
-         -f x11grab -r $FPS -s $SCREEN_RES -i $SCREEN_N                              \
-         -filter_complex "[1:0][0:0]overlay=main_w-overlay_w:main_h-overlay_h"       \
-         -f jack -i avconv                                                           \
-         -vcodec libx264 -pre:0 $QUALITY -g 45 -vb $CBR -maxrate $CBR -bufsize 1200k \
-         -acodec aac -ar $AUDIO_SAMPLERATE -ab $AUDIO_BITRATE -strict experimental   \
-         -f flv $DEST
+FONT='fontfile=/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans-Bold.ttf: fontsize=12: fontcolor=white@1.0'
+STATIC_TEXT='text=some text'
+STATIC_TEXT_POS='x=(w-text_w)/2: y=(h-text_h-line_h)'
+MARQUEE_TEXT='text=this is a very very very very very very very very very very very very very very long line of text'
+MARQUEE_TEXT_POS='y=h-line_h: x=-50*t'
+SCROLL_TEXT_POS="y=h-2*t"
+TEXT_FILE=/code/ffmpeg-text
+FILE_TEXT="textfile=$TEXT_FILE: reload=1"
+TEXT=$FILE_TEXT
+TEXT_POS=$STATIC_TEXT_POS
+
+MAIN_INPUT=$WEBCAM_INPUT
+
+  ffmpeg $MAIN_INPUT                                        \
+         -filter_complex drawtext="$FONT: $TEXT: $TEXT_POS" \
+         $AUDIO_INPUT                                       \
+         $VIDEO_OUTPUT                                      \
+         $AUDIO_OUTPUT                                      \
+         $STREAM_OUTPUT
+}
+
+screenPlusCamPlusText()
+{
+FONT_FILE=/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans-Bold.ttf
+FONT_SIZE=48
+TEXT_BORDER_D=4
+BLINK_TEXT_PERIOD=300
+BLINK_TEXT_DURATION=12
+TEXT_COLOR='white@1.0'
+TEXT_BORDER_COLOR='purple@1.0'
+TEXT_BG_COLOR='black@0.5'
+FONT='fontfile='$FONT_FILE': fontsize='$FONT_SIZE': fontcolor='$TEXT_COLOR
+TEXT_BG='box=1: boxcolor='$TEXT_BG_COLOR': borderw='$TEXT_BORDER_D': bordercolor='$TEXT_BORDER_COLOR
+BLINK_TEXT='enable=lt(mod(t\,'$BLINK_TEXT_PERIOD')\,'$BLINK_TEXT_DURATION')'
+STATIC_TEXT='text=BLINKING text'
+STATIC_TEXT_X_CENTER_POS='x=(main_w-text_w)/2'
+# MARQUEE_TEXT_X_POS='x=main_w-(50*t): y=main_h-line_h' # once on load
+TEXT_TOP_POS='y=0' # unused
+TEXT_BOTTOM_POS='y=main_h-line_h'
+TEXT_Y_POS=$TEXT_BOTTOM_POS
+MARQUEE_TEXT_X_POS='x=main_w-((('$SCREEN_W'+text_w)/'$BLINK_TEXT_DURATION')*mod(t\,'$BLINK_TEXT_DURATION'))'
+TEXT_FILE=/code/ffmpeg-text
+FILE_TEXT="textfile=$TEXT_FILE: reload=1"
+TEXT=$FILE_TEXT
+TEXT_POS="$MARQUEE_TEXT_X_POS: $TEXT_Y_POS: $BLINK_TEXT"
+
+  ffmpeg $MAIN_INPUT                                                                  \
+         $OVERLAY_INPUT                                                               \
+         -filter_complex "overlay='$OVERLAY_POS', drawtext='$FONT: $TEXT: $TEXT_POS: $TEXT_BG'" \
+         $AUDIO_INPUT                                                                 \
+         $VIDEO_OUTPUT                                                                \
+         $AUDIO_OUTPUT                                                                \
+         $STREAM_OUTPUT
+
+#          -filter_complex 'overlay=main_w-overlay_w:main_h-overlay_h,drawtext=fontfile=/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans-Bold.ttf: text='`date | tr " " "-"`': fontcolor=white@1.0: x=main_w/2-text_w/2: y=main_h-48: fontsize=48' \
 }
 
 twoOverlays()
 {
+# TODO: nfg
   avconv -s $CAM_RES -f video4linux2 -i $CAM_DEV                                                          \
          -f image2 -i ~/dl/me-sm.jpeg                                                                     \
          -f x11grab -r $FPS -s $SCREEN_RES -i $SCREEN_N                                                   \
@@ -90,6 +141,8 @@ twoOverlays()
 }
 
 
-# while ((1)) ; do loop ; done ;
-# while ((1)) ; do twoOverlays ; sleep 5 ; done ;
-while ((1)) ; do textOverlay ; sleep 5 ; done ;
+[ "$1" == "screen" ] && screenPlusCam         && exit
+[ "$1" == "text"   ] && screenPlusText        && exit
+[ "$1" == "exp"    ] && screenPlusCamPlusText && exit
+
+while ((1)) ; do screenPlusCamPlusText ; sleep 1 ; done ;
