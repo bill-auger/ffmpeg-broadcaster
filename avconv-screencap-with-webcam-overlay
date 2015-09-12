@@ -1,7 +1,6 @@
 #!/bin/bash
 
 
-AUDIO_BITRATE="128k"
 
 
 # user params
@@ -12,7 +11,9 @@ SCREEN_RES="1280x800"       # desktop input resolution
 CAM_RES="160x120"           # webcam input/output resolution
 STREAM_RES="768x480"        # mix output resolution
 FPS="12"                    # target output FPS
-AUDIO_SAMPLERATE="22050"    # audio bitrate (22050 is plenty for voice)
+AUDIO_CHANNELS="2"          # number of channels
+AUDIO_SAMPLERATE="22050"    # audio samplerate (22050 is plenty for voice)
+AUDIO_BITRATE="128k"        # audio bitrate (64k per channel is plenty for voice)
 CBR="800k"                  # constant output bitrate (should be between 1000k - 3000k)
 GOP_MIN="$FPS"              # min i-frame interval, should be equal to fps  (TODO: unused)
 GOP_MAX="$(($FPS*2))"       # max i-frame interval, should be double of FPS (TODO: unused)
@@ -27,7 +28,7 @@ HIDE_LOGS="-loglevel quiet" # no console output
 SCREENCAP_INPUT="-f x11grab -s "$SCREEN_RES" -r "$FPS" -i $SCREEN_N"
 SDP_INPUT="-i /code/vlc-screen.sdp"
 WEBCAM_INPUT="-f v4l2 -s $CAM_RES -r $FPS -i $CAM_DEV"
-STATIC_INPUT="-i me.png"
+STATIC_INPUT="-f image2 -i ~/dl/me-sm.jpeg"
 MAIN_INPUT=$SCREENCAP_INPUT
 # MAIN_INPUT=$SDP_INPUT
 # MAIN_INPUT=$WEBCAM_INPUT
@@ -44,20 +45,51 @@ JACK_INPUT="-f jack -i ffmpeg"
 # AUDIO_INPUT=$ALSA_INPUT
 # AUDIO_INPUT=$PULSE_INPUT
 AUDIO_INPUT=$JACK_INPUT
-STREAM_OUTPUT="-f flv -ac 2 -ar $AUDIO_SAMPLERATE -vcodec libx264 -keyint_min 60 \
+STREAM_OUTPUT="-f flv -ac $AUDIO_CHANNELS -ar $AUDIO_SAMPLERATE -vcodec libx264 -keyint_min 60 \
                -b:v $CBR -minrate $CBR -maxrate $CBR -pix_fmt yuv420p            \
                -s $STREAM_RES -preset $QUALITY -acodec libfaac -bufsize $CBR"
 THREADS="-threads $THREADS $HIDE_LOGS"
 RTMP_URL="rtmp://usmedia3.livecoding.tv:1935/livecodingtv/$LIVECODING_STREAM_KEY"
 DUMP_FILE=/code/livecoding.mp4
 DEST=$RTMP_URL
-# DEST=$DUMP_FILE
+DEST=$DUMP_FILE
 
 
-avconv -s $CAM_RES -f video4linux2 -i $CAM_DEV                                     \
-       -f x11grab -r $FPS -s $SCREEN_RES -i $SCREEN_N                              \
-       -filter_complex "[1:0][0:0]overlay=main_w-overlay_w:main_h-overlay_h"       \
-       -f jack -i avconv                                                           \
-       -vcodec libx264 -pre:0 $QUALITY -g 45 -vb $CBR -maxrate $CBR -bufsize 1200k \
-       -acodec aac -ar $AUDIO_SAMPLERATE -ab $AUDIO_BITRATE -strict experimental   \
-       -f flv $DEST
+loop()
+{
+  avconv -s $CAM_RES -f video4linux2 -i $CAM_DEV                                     \
+         -f x11grab -r $FPS -s $SCREEN_RES -i $SCREEN_N                              \
+         -filter_complex "[1:0][0:0]overlay=main_w-overlay_w:main_h-overlay_h"       \
+         -f jack -i avconv                                                           \
+         -vcodec libx264 -pre:0 $QUALITY -g 45 -vb $CBR -maxrate $CBR -bufsize 1200k \
+         -acodec aac -ar $AUDIO_SAMPLERATE -ab $AUDIO_BITRATE -strict experimental   \
+         -f flv $DEST
+}
+
+textOverlay()
+{
+  avconv -s $CAM_RES -f video4linux2 -i $CAM_DEV                                     \
+         -f x11grab -r $FPS -s $SCREEN_RES -i $SCREEN_N                              \
+         -filter_complex "[1:0][0:0]overlay=main_w-overlay_w:main_h-overlay_h"       \
+         -f jack -i avconv                                                           \
+         -vcodec libx264 -pre:0 $QUALITY -g 45 -vb $CBR -maxrate $CBR -bufsize 1200k \
+         -acodec aac -ar $AUDIO_SAMPLERATE -ab $AUDIO_BITRATE -strict experimental   \
+         -f flv $DEST
+}
+
+twoOverlays()
+{
+  avconv -s $CAM_RES -f video4linux2 -i $CAM_DEV                                                          \
+         -f image2 -i ~/dl/me-sm.jpeg                                                                     \
+         -f x11grab -r $FPS -s $SCREEN_RES -i $SCREEN_N                                                   \
+         -filter_complex "[2:0][0:0]overlay=main_w-overlay_w:main_h-overlay_h[out];[out][1:0]overlay=0:0" \
+         -f jack -i avconv                                                                                \
+         -vcodec libx264 -pre:0 $QUALITY -g 45 -vb $CBR -maxrate $CBR -bufsize 1200k                      \
+         -acodec aac -ar $AUDIO_SAMPLERATE -ab $AUDIO_BITRATE -strict experimental                        \
+         -f flv $DEST
+}
+
+
+# while ((1)) ; do loop ; done ;
+# while ((1)) ; do twoOverlays ; sleep 5 ; done ;
+while ((1)) ; do textOverlay ; sleep 5 ; done ;
