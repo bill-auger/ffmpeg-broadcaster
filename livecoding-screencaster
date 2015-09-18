@@ -1,12 +1,12 @@
 #!/bin/bash
 
 
-# user params
+# user a/v params
 STREAM_KEY=""                    # your streaming key goes here (or define LIVECODING_STREAM_KEY in env)
 SCREEN_W=1280                    # input screen width (e.g. desktop width)
 SCREEN_H=800                     # input screen height (e.g. desktop height)
 SCREEN_RES=$SCREEN_W'x'$SCREEN_H # desktop input resolution
-SCREEN_N=":0.0"                  # display/desktop number to capture (first is :0.0)
+SCREEN_N=":0.0"                  # display/screen number to capture (usually :0.0)
 CAM_LG_W=640                     # input screen width (e.g. desktop width)
 CAM_LG_H=480                     # input screen height (e.g. desktop height)
 CAM_SM_W=160                     # input screen width (e.g. desktop width)
@@ -18,9 +18,9 @@ STREAM_W=768                     # input screen width (e.g. desktop width)
 STREAM_H=480                     # input screen height (e.g. desktop height)
 STREAM_RES=$STREAM_W'x'$STREAM_H # mix output resolution
 FPS="12"                         # target output FPS
-CBR="800k"                       # constant output bitrate (should be between 1000k - 3000k)
 GOP="$(($FPS*4))"                # i-frame interval
-AUDIO_CHANNELS="2"               # number of channels
+CBR="800k"                       # constant output bitrate (should be between 800k - 1300k)
+# AUDIO_CHANNELS="2"               # number of channels (unused) TODO: should be used
 AUDIO_SAMPLERATE="22050"         # audio samplerate (22050 is plenty for voice)
 AUDIO_BITRATE="128k"             # audio bitrate (64k per channel is plenty for voice)
 THREADS="0"                      # 0 for auto - max 6
@@ -29,42 +29,37 @@ LOGGING="-loglevel quiet"        # console output
 # LOGGING="-loglevel error"      # fatal errors console output
 # LOGGING=""                     # verbose console output
 
-# user text options
+# user image params
+LOGO_IMG=./logo.jpeg
+SPLASH_IMG=/code/av-caster/Assets/fractal-brb-1280x800.png
+
+# user text params
+TEXT_FILE=/run/user/`id -u`/av-caster-text
 FONT_FILE=/usr/share/fonts/truetype/tlwg/Purisa.ttf
 FONT_SIZE=48
 TEXT_BORDER_D=4
+TEXT_SHADOW_W=8
+TEXT_SHADOW_H=8
 BLINK_TEXT_PERIOD=300
 BLINK_TEXT_DURATION=12
 TEXT_COLOR='white@1.0'
 TEXT_BORDER_COLOR='purple@1.0'
 TEXT_BG_COLOR='black@0.5'
 
-# text overlay params
-FONT='fontfile='$FONT_FILE': fontsize='$FONT_SIZE': fontcolor='$TEXT_COLOR': shadowx=8: shadowy=8'
-TEXT_BG='box=1: boxcolor='$TEXT_BG_COLOR
-TEXT_BORDER='borderw='$TEXT_BORDER_D': bordercolor='$TEXT_BORDER_COLOR
-BLINK_TEXT='enable=lt(mod(t\,'$BLINK_TEXT_PERIOD')\,'$BLINK_TEXT_DURATION')'
-[ $FFMPEG_OVERLAY_TEXT ] || FFMPEG_OVERLAY_TEXT="some text"
-STATIC_TEXT='text='$FFMPEG_OVERLAY_TEXT
-STATIC_TEXT_X_CENTER_POS='x=(main_w-text_w)/2'
-TEXT_TOP_POS='y=0'                                                            # unused
-TEXT_BOTTOM_POS='y=main_h-(line_h*1.5)'
-MARQUEE_TEXT_X_POS='x=main_w-((('$SCREEN_W'+text_w)/'$BLINK_TEXT_DURATION')*mod(t\,'$BLINK_TEXT_DURATION'))'
-TEXT_FILE=/code/ffmpeg-text
-FILE_TEXT="textfile=$TEXT_FILE: reload=1"
-
-# a/v params
+# general a/v params
 SCREENCAP_INPUT="-f x11grab -s "$SCREEN_RES" -r "$FPS" -i $SCREEN_N"
 WEBCAM_INPUT_LG="-f video4linux2 -s $CAM_HI_RES -i $CAM_DEV"
 WEBCAM_INPUT_SM="-f video4linux2 -s $CAM_LO_RES -i $CAM_DEV"
-SDP_INPUT="-i /code/vlc-screen.sdp"                                           # unused
-STATIC_INPUT="-f image2 -i ~/dl/me-sm.jpeg"                                   # unused
-ALSA_INPUT="-f alsa -i hw:0"                                                  # unused
-PULSE_INPUT="-f pulse -name ffmpeg -sample_rate $AUDIO_SAMPLERATE -i default" # unused
-JACK_INPUT="-f jack -i ffmpeg"
-OVERLAY_TL_POS="0: 0"                                                         # unused
+SDP_INPUT="-i /code/vlc-screen.sdp"                                            # unused
+STATIC_INPUT_SM="-f image2 -i $LOGO_IMG"                                       # unused
+STATIC_INPUT_LG="-f image2 -loop 1 -framerate $FPS -i $SPLASH_IMG"
+ALSA_INPUT="-f alsa -i hw:0"                                                   # unused
+PULSE_INPUT="-f pulse -name ffmpeg -sample_rate $AUDIO_SAMPLERATE -i default"  # unused
+JACK_INPUT="-f jack  -i ffmpeg"
+OVERLAY_TL_POS="0: 0"                                                          # unused
 OVERLAY_BR_POS="main_w-overlay_w: main_h-overlay_h"
-X264_OUUTPUT="-vcodec libx264 -preset $QUALITY -s $STREAM_RES -g $GOP -vb $CBR -maxrate $CBR -bufsize $CBR"
+X264_OUTPUT="-vcodec libx264 -pix_fmt yuv420p -preset $QUALITY -s $STREAM_RES
+              -g $GOP -vb $CBR -maxrate $CBR -bufsize $CBR"
 AAC_OUTPUT="-acodec aac -ar $AUDIO_SAMPLERATE -ab $AUDIO_BITRATE -strict experimental"
 THREADS="-threads $THREADS"
 [ $LIVECODING_STREAM_KEY ] || LIVECODING_STREAM_KEY=$STREAM_KEY
@@ -73,18 +68,52 @@ DUMP_FILE=/code/livecoding.mp4
 FILE_OUTPUT="-f flv $DUMP_FILE"
 LIVE_OUTPUT="-f flv $RTMP_URL"
 
-# user selections
+# general text params
+FONT='fontfile='$FONT_FILE': fontsize='$FONT_SIZE': fontcolor='$TEXT_COLOR': shadowx='$TEXT_SHADOW_W' : shadowy='$TEXT_SHADOW_H
+TEXT_BG='box=1: boxcolor='$TEXT_BG_COLOR                                       # unused
+TEXT_BORDER='borderw='$TEXT_BORDER_D': bordercolor='$TEXT_BORDER_COLOR
+BLINK_TEXT=': enable=lt(mod(t\,'$BLINK_TEXT_PERIOD')\,'$BLINK_TEXT_DURATION')' # unused
+[ $FFMPEG_OVERLAY_TEXT ] || FFMPEG_OVERLAY_TEXT="some text"
+STATIC_TEXT='text='$FFMPEG_OVERLAY_TEXT                                        # unused
+TEXT_X_CENTER_POS='x=(main_w-text_w)/2'
+TEXT_Y_TOP_POS='y=0'                                                           # unused
+TEXT_Y_BOTTOM_POS='y=main_h-(line_h*1.5)'
+TEXT_X_MARQUEE_POS='x=main_w-((('$SCREEN_W'+text_w)/'$BLINK_TEXT_DURATION')*mod(t\,'$BLINK_TEXT_DURATION'))'$BLINK_TEXT
+FILE_TEXT="textfile=$TEXT_FILE: reload=1"
+
+# user a/v configuration
 MAIN_INPUT=$SCREENCAP_INPUT
 OVERLAY_INPUT=$WEBCAM_INPUT_SM
 OVERLAY_POS=$OVERLAY_BR_POS
 AUDIO_INPUT=$JACK_INPUT
-VIDEO_OUTPUT=$X264_OUUTPUT
+VIDEO_OUTPUT=$X264_OUTPUT
 AUDIO_OUTPUT=$AAC_OUTPUT
 STREAM_OUTPUT=$LIVE_OUTPUT
 
+# user text configuration
+TEXT=": $FILE_TEXT"
+# TEXT_POS=": $TEXT_X_CENTER_POS: $TEXT_Y_BOTTOM_POS"
+TEXT_POS=": $TEXT_X_MARQUEE_POS: $TEXT_Y_BOTTOM_POS"
+TEXT_DECORATIONS=": $TEXT_BORDER"
+DRAWTEXT_PARAMS="$FONT $TEXT $TEXT_POS $TEXT_DECORATIONS"
+
+
+screenPlusText()
+{
+  printf "\nlaunching screenPlusText configuration\n\n"
+  ffmpeg $MAIN_INPUT                                 \
+         -filter_complex drawtext="$DRAWTEXT_PARAMS" \
+         $AUDIO_INPUT                                \
+         $VIDEO_OUTPUT                               \
+         $AUDIO_OUTPUT                               \
+         $THREADS                                    \
+         $LOGGING                                    \
+         $STREAM_OUTPUT
+}
 
 screenPlusCam()
 {
+  printf "\nlaunching screenPlusCam configuration\n\n"
   avconv $MAIN_INPUT                           \
          $OVERLAY_INPUT                        \
         -filter_complex overlay="$OVERLAY_POS" \
@@ -99,39 +128,52 @@ screenPlusCam()
 camPlusText()
 {
 MAIN_INPUT=$WEBCAM_INPUT_LG
-TEXT=$FILE_TEXT
-TEXT_POS="$STATIC_TEXT_X_CENTER_POS: $TEXT_BOTTOM_POS"
-TEXT_DECORATIONS=$TEXT_BORDER
-DRAWTEXT_PARAMS="$FONT: $TEXT: $TEXT_POS"
 
+  printf "\nlaunching camPlusText configuration\n\n"
   ffmpeg $MAIN_INPUT                                 \
          -filter_complex drawtext="$DRAWTEXT_PARAMS" \
          $AUDIO_INPUT                                \
          $VIDEO_OUTPUT                               \
          $AUDIO_OUTPUT                               \
+         $THREADS                                    \
+         $LOGGING                                    \
          $STREAM_OUTPUT
 }
 
 screenPlusCamPlusText()
 {
-TEXT=$STATIC_TEXT
-TEXT=$FILE_TEXT
-TEXT_POS="$MARQUEE_TEXT_X_POS: $TEXT_BOTTOM_POS: $BLINK_TEXT"
-TEXT_DECORATIONS=$TEXT_BORDER
-DRAWTEXT_PARAMS="$FONT: $TEXT: $TEXT_POS: $TEXT_DECORATIONS"
-
+  printf "\nlaunching screenPlusCamPlusText configuration\n\n"
   ffmpeg $MAIN_INPUT                                                           \
          $OVERLAY_INPUT                                                        \
          -filter_complex "overlay='$OVERLAY_POS', drawtext='$DRAWTEXT_PARAMS'" \
          $AUDIO_INPUT                                                          \
          $VIDEO_OUTPUT                                                         \
          $AUDIO_OUTPUT                                                         \
+         $THREADS                                                              \
+         $LOGGING                                                              \
+         $STREAM_OUTPUT
+}
+
+interstitial()
+{
+MAIN_INPUT=$STATIC_INPUT_LG
+
+  printf "\nlaunching interstitial configuration\n\n"
+  ffmpeg $MAIN_INPUT    \
+         $AUDIO_INPUT   \
+         $VIDEO_OUTPUT  \
+         $AUDIO_OUTPUT  \
+         $THREADS       \
          $STREAM_OUTPUT
 }
 
 
-[ "$1" == "screen" ] && screenPlusCam         && exit
-[ "$1" == "cam"    ] && camPlusText           && exit
-[ "$1" == "all"    ] && screenPlusCamPlusText && exit
+[ $TEXT_FILE ] && [ ! -f $TEXT_FILE ] && echo "" > $TEXT_FILE
+
+[ "$1" == "screen-text" ] && (screenPlusText        ; exit)
+[ "$1" == "screen-cam"  ] && (screenPlusCam         ; exit)
+[ "$1" == "cam-text"    ] && (camPlusText           ; exit)
+[ "$1" == "all"         ] && (screenPlusCamPlusText ; exit)
+[ "$1" == "break"       ] && (interstitial          ; exit)
 
 while ((1)) ; do screenPlusCamPlusText ; sleep 1 ; done ;
