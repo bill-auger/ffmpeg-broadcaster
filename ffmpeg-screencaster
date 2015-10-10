@@ -1,6 +1,6 @@
 #!/bin/bash
 
-THIS_NAME=`basename \"$0\"`
+THIS_NAME=`basename $0`
 USAGE="USAGE:
     $THIS_NAME [ a_configuration [ once ] ]
 
@@ -33,16 +33,16 @@ USAGE="USAGE:
 
 # user a/v params
 [ ! -z "$STREAM_KEY" ] || STREAM_KEY="" # your private stream key (or define STREAM_KEY in env)
-SCREEN_W=1680                           # input screen width  (e.g. desktop width )
-SCREEN_H=1050                           # input screen height (e.g. desktop height)
+SCREEN_W=1280                           # input screen width  (e.g. desktop width )
+SCREEN_H=800                            # input screen height (e.g. desktop height)
 SCREEN_N=":0.0"                         # display/screen number to capture (usually :0.0)
 CAM_LG_W=640                            # input screen width  (e.g. desktop width )
 CAM_LG_H=480                            # input screen height (e.g. desktop height)
 CAM_SM_W=160                            # input screen width  (e.g. desktop width )
 CAM_SM_H=120                            # input screen height (e.g. desktop height)
-CAM_DEV=/dev/video0                     # video device to grab (first is /dev/video0)
-STREAM_W=1680                           # input screen width  (e.g. desktop width )
-STREAM_H=1050                           # input screen height (e.g. desktop height)
+CAM_DEV=/dev/video42                    # video device to grab (first is /dev/video0)
+STREAM_W=1280                           # input screen width  (e.g. desktop width )
+STREAM_H=800                            # input screen height (e.g. desktop height)
 FPS=12                                  # target output FPS
 GOP="$(($FPS*4))"                       # i-frame interval
 CBR="1200k"                             # constant output bitrate (should be between 800k - 1300k)
@@ -53,6 +53,7 @@ AUDIO_BITRATE="128k"                    # audio bitrate (64k per channel is plen
 ALSA_DEVICE="hw:0"                      # ALSA plug device (usually hw:0)
 THREADS=0                               # 0 for auto - max 6
 QUALITY="ultrafast"                     # one of the many FFMPEG presets
+EXIT_CMD="play-error-sound.sh"
 
 # user image params
 [ ! -z "$STREAM_IMG" ] || STREAM_IMG="" # fullscreen interstitial image (or define STREAM_IMG in env)
@@ -93,7 +94,7 @@ X264_OUTPUT="-vcodec libx264 -pix_fmt yuv420p -preset $QUALITY -s $STREAM_RES
 AAC_OUTPUT="-acodec aac -ar $AUDIO_SAMPLERATE -ab $AUDIO_BITRATE -strict experimental"
 THREADS="-threads $THREADS"
 RTMP_URL="rtmp://usmedia3.livecoding.tv:1935/livecodingtv/$STREAM_KEY"
-DUMP_FILE=/code/livecoding.mp4
+DUMP_FILE=./livecoding.mp4
 FILE_OUTPUT="-f flv $DUMP_FILE"
 LIVE_OUTPUT="-f flv $RTMP_URL"
 
@@ -101,7 +102,7 @@ LIVE_OUTPUT="-f flv $RTMP_URL"
 FONT='fontfile='$FONT_FILE': fontsize='$FONT_SIZE': fontcolor='$TEXT_COLOR': shadowx='$TEXT_SHADOW_W' : shadowy='$TEXT_SHADOW_H
 TEXT_BG='box=1: boxcolor='$TEXT_BG_COLOR                                       # unused
 TEXT_BORDER='borderw='$TEXT_BORDER_D': bordercolor='$TEXT_BORDER_COLOR
-[ ! -z "$TEXT_FILE"   ] && [ -f $TEXT_FILE ] && STREAM_TEXT=`cat $TEXT_FILE`
+[ ! -z "$TEXT_FILE" ] && [ -f $TEXT_FILE ] && STREAM_TEXT=`cat $TEXT_FILE`
 BLINK_TEXT_DURATION=$((${#STREAM_TEXT}/$TEXT_MARQUEE_SPEED))
 BLINK_TEXT=': enable=lt(mod(t\,'$BLINK_TEXT_PERIOD')\,'$BLINK_TEXT_DURATION')' # unused
 STATIC_TEXT='text='$STREAM_TEXT                                                # unused
@@ -117,7 +118,6 @@ LOGGING_ERRORS="-loglevel error"
 LOGGING_VERBOSE=""
 
 # user a/v configuration
-MAIN_INPUT=$SCREENCAP_INPUT    # one of WEBCAM_INPUT_LG , STATIC_INPUT_LG , SCREENCAP_INPUT
 OVERLAY_INPUT=$WEBCAM_INPUT_SM # one of WEBCAM_INPUT_SM , STATIC_INPUT_SM
 OVERLAY_POS=$OVERLAY_BR_POS    # one of OVERLAY_TL_POS , OVERLAY_BR_POS
 AUDIO_INPUT=$JACK_INPUT        # one of ALSA_INPUT , PULSE_INPUT , JACK_INPUT
@@ -138,25 +138,26 @@ DRAWTEXT_PARAMS="$FONT $TEXT $TEXT_POS $TEXT_DECORATIONS"
 
 # user logging configuration
 LOGGING=$LOGGING_NONE # console output (one of LOGGING_NONE , LOGGING_ERRORS , LOGGING_VERBOSE)
-LOGGING=$LOGGING_ERRORS
 
 
 screenOnly()
 {
   printf "\nlaunching screenOnly configuration\n\n"
-  ffmpeg $MAIN_INPUT                                 \
+  ffmpeg $SCREENCAP_INPUT                            \
          $AUDIO_INPUT                                \
          $VIDEO_OUTPUT                               \
          $AUDIO_OUTPUT                               \
          $THREADS                                    \
          $LOGGING                                    \
          $STREAM_OUTPUT
+  QUIT=$?
+echo "QUIT=$QUIT"
 }
 
 screenPlusText()
 {
   printf "\nlaunching screenPlusText configuration\n\n"
-  ffmpeg $MAIN_INPUT                                 \
+  ffmpeg $SCREENCAP_INPUT                            \
          -filter_complex drawtext="$DRAWTEXT_PARAMS" \
          $AUDIO_INPUT                                \
          $VIDEO_OUTPUT                               \
@@ -164,12 +165,13 @@ screenPlusText()
          $THREADS                                    \
          $LOGGING                                    \
          $STREAM_OUTPUT
+  QUIT=$?
 }
 
 screenPlusCam()
 {
   printf "\nlaunching screenPlusCam configuration\n\n"
-  avconv $MAIN_INPUT                           \
+  avconv $SCREENCAP_INPUT                      \
          $OVERLAY_INPUT                        \
         -filter_complex overlay="$OVERLAY_POS" \
          $AUDIO_INPUT                          \
@@ -178,14 +180,13 @@ screenPlusCam()
          $THREADS                              \
          $LOGGING                              \
          $STREAM_OUTPUT
+  QUIT=$?
 }
 
 camPlusText()
 {
-MAIN_INPUT=$WEBCAM_INPUT_LG
-
   printf "\nlaunching camPlusText configuration\n\n"
-  ffmpeg $MAIN_INPUT                                 \
+  ffmpeg $WEBCAM_INPUT_LG                            \
          -filter_complex drawtext="$DRAWTEXT_PARAMS" \
          $AUDIO_INPUT                                \
          $VIDEO_OUTPUT                               \
@@ -193,12 +194,13 @@ MAIN_INPUT=$WEBCAM_INPUT_LG
          $THREADS                                    \
          $LOGGING                                    \
          $STREAM_OUTPUT
+  QUIT=$?
 }
 
 screenPlusCamPlusText()
 {
   printf "\nlaunching screenPlusCamPlusText configuration\n\n"
-  ffmpeg $MAIN_INPUT                                                           \
+  ffmpeg $SCREENCAP_INPUT                                                      \
          $OVERLAY_INPUT                                                        \
          -filter_complex "overlay='$OVERLAY_POS', drawtext='$DRAWTEXT_PARAMS'" \
          $AUDIO_INPUT                                                          \
@@ -207,28 +209,29 @@ screenPlusCamPlusText()
          $THREADS                                                              \
          $LOGGING                                                              \
          $STREAM_OUTPUT
+  QUIT=$?
 }
 
 interstitial()
 {
-MAIN_INPUT=$STATIC_INPUT_LG
-
   printf "\nlaunching interstitial configuration\n\n"
-  ffmpeg $MAIN_INPUT    \
-         $AUDIO_INPUT   \
-         $VIDEO_OUTPUT  \
-         $AUDIO_OUTPUT  \
-         $THREADS       \
-         $LOGGING       \
+  ffmpeg $STATIC_INPUT_LG \
+         $AUDIO_INPUT    \
+         $VIDEO_OUTPUT   \
+         $AUDIO_OUTPUT   \
+         $THREADS        \
+         $LOGGING        \
          $STREAM_OUTPUT
+  QUIT=$?
 }
 
-launch() { echo "$QUIT_MSG" ; $SELECTED_CONFIGURATION ; echo "stream ended at `date`" ; }
+launch()
+{
+  printf "\nstream started at `date`\n\n$QUIT_MSG" ;
+  $SELECTED_CONFIGURATION
+  printf "\nstream ended at `date`\n\n" ;
+}
 
-
-# sanity checks
-if [ -z "$STREAM_KEY" ] ; then echo "STREAM_KEY undefined" ; exit ; fi ;
-if [ -z "$STREAM_IMG" ] ; then echo "STREAM_IMG undefined" ; exit ; fi ;
 
 # swicth on configuration
 SELECTED_CONFIGURATION="screenPlusCamPlusText"
@@ -239,10 +242,17 @@ SELECTED_CONFIGURATION="screenPlusCamPlusText"
 [ "$1" == "all"         ] && SELECTED_CONFIGURATION="screenPlusCamPlusText"
 [ "$1" == "break"       ] && SELECTED_CONFIGURATION="interstitial"
 
+# sanity checks
+if [ -z "$STREAM_KEY" ] ; then echo "STREAM_KEY undefined" ; exit ; fi ;
+if [ -z "$STREAM_IMG" ] && [ "$SELECTED_CONFIGURATION" == "interstitial" ]
+                          then echo "STREAM_IMG undefined" ; exit ; fi ;
+
 # launch configuration once
 QUIT_MSG="press <q> to exit"
 if [ "$2" == "once" ] ; then launch ; exit ; fi ;
 
 # launch configuration indefinitely
 QUIT_MSG="press <q> to restart the stream - press <CTRL-c> to exit"
-while ! (($?)) ; do sleep 1 ; launch ; done ;
+# while ! (($QUIT)) ; do sleep 1 ; launch ; $EXIT_CMD ; done ;
+# TODO: ffmpeg exits with 0 on server kick - need some way to trap this
+while ((1)) ; do sleep 1 ; launch ; $EXIT_CMD ; done ;

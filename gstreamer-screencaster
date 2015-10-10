@@ -1,0 +1,76 @@
+#!/bin/bash
+
+# NOTE: this script is not yet working properly
+#         screencap works well as do videotestsrc and audiotestsrc
+#         but using alsa , pulse , or jack audio cause the audio to be intermittent
+#         e.g. recording "test 1 2 3 4 5 6 7 8 9" results like "test 3 6 8 9"
+
+# configuration
+WIDTH=1280
+HEIGHT=800
+FPS=12
+VIDEO_BITRATE=1200
+SAMPLERATE=44100
+AUDIO_BITRATE=128
+N_CHANNELS=2
+
+# constants
+VIDEO_TEST_SRC='videotestsrc pattern=0 is-live=true'
+AUDIO_TEST_SRC='audiotestsrc is-live=true'
+# SCREENCAP_SRC="ximagesrc endx=$(($WIDTH-1)) endy=$(($HEIGHT-1)) use-damage=false show-pointer=true"
+# TIME_SRC='timeoverlay halignment=left valignment=top text="t:" shaded-background=true'
+PULSE_SRC='pulsesrc'
+H264_ENCODER="x264enc bitrate=$VIDEO_BITRATE bframes=0"
+LAME_ENCODER="lamemp3enc bitrate=$AUDIO_BITRATE"
+# VIDEO_TEST_CAPS="video/x-raw, format=(string)BGRA,  pixel-aspect-ratio=(fraction)1/1, interlace-mode=(string)progressive, framerate=$FPS/1, width=$WIDTH, height=$HEIGHT"
+# AUDIO_TEST_CAPS="audio/x-raw, format=(string)S16LE, endianness=(int)1234, signed=(boolean)true, width=(int)16, depth=(int)16, rate=(int)$SAMPLERATE, channels=(int)$N_CHANNELS"
+# PULSE_CAPS="     audio/x-raw, format=(string)S16LE, rate=(int)$SAMPLERATE, channels=(int)$N_CHANNELS, layout=(string)interleaved"
+VIDEO_TEST_CAPS="video/x-raw, format=(string)BGRA,  framerate=(fraction)$FPS/1, width=(int)$WIDTH, height=(int)$HEIGHT"
+AUDIO_TEST_CAPS="audio/x-raw, format=(string)S16LE, rate=(int)$SAMPLERATE, channels=(int)$N_CHANNELS"
+SCREENCAP_CAPS=" video/x-raw,                       framerate=(fraction)$FPS/1, width=(int)$WIDTH, height=(int)$HEIGHT, pixel-aspect-ratio=(fraction)1/1"
+PULSE_CAPS="     audio/x-raw, format=(string)S16LE, rate=(int)$SAMPLERATE, channels=(int)$N_CHANNELS"
+H264_ENC_CAPS='  video/x-h264, level=(string)4.1, profile=main'
+FLV_MUXER='flvmux streamable=true name=mux'
+OUTPUT_FILE=./deleteme.flv
+FILE_OUTPUT="filesink location=$OUTPUT_FILE"
+DEBUG_LOGGING='--gst-debug-level=2'
+VERBOSE_LOGGING='--verbose'
+
+# input selections
+VIDEO_SRC=$VIDEO_TEST_SRC
+VIDEO_CAPS=$VIDEO_TEST_CAPS
+# OVERLAY_SRC=$TIME_SRC # NOTE: put OVERLAY_SRC between VIDEO_SRC and VIDEO_CAPS
+VIDEO_ENC_CAPS=$H264_ENC_CAPS
+VIDEO_ENCODER=$H264_ENCODER
+# AUDIO_SRC=$AUDIO_TEST_SRC
+AUDIO_SRC=$PULSE_SRC
+# AUDIO_CAPS=$AUDIO_TEST_CAPS
+AUDIO_CAPS=$PULSE_CAPS
+AUDIO_ENCODER=$LAME_ENCODER
+MUXER=$FLV_MUXER
+OUTPUT_STREAM=$FILE_OUTPUT
+LOGGING="$DEBUG_LOGGING $VERBOSE_LOGGING"
+
+
+gst-launch-1.0 $LOGGING $VIDEO_SRC        ! \
+                          $VIDEO_CAPS     ! \
+                          queue           ! \
+                          videoconvert    ! \
+                          $VIDEO_ENCODER  ! \
+                          h264parse       ! \
+                          $VIDEO_ENC_CAPS ! \
+                          queue           ! \
+                          mux.              \
+                        $AUDIO_SRC       !  \
+                          $AUDIO_CAPS    !  \
+                          queue          !  \
+                          queue          !  \
+                          $AUDIO_ENCODER !  \
+                          mpegaudioparse !  \
+                          queue          !  \
+                          queue          !  \
+                          queue          !  \
+                          mux.              \
+                        $MUXER           !  \
+                          queue          !  \
+                          $OUTPUT_STREAM
