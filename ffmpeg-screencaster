@@ -1,6 +1,6 @@
 #!/bin/bash
 
-THIS_NAME=`basename $0`
+THIS_NAME=`basename "$0"`
 USAGE="USAGE:
     $THIS_NAME [ a_configuration [ once ] ]
 
@@ -40,7 +40,7 @@ CAM_LG_W=640                            # input screen width  (e.g. desktop widt
 CAM_LG_H=480                            # input screen height (e.g. desktop height)
 CAM_SM_W=160                            # input screen width  (e.g. desktop width )
 CAM_SM_H=120                            # input screen height (e.g. desktop height)
-CAM_DEV=/dev/video42                    # video device to grab (first is /dev/video0)
+CAM_DEV=/dev/video0                     # video device to grab (first is /dev/video0)
 STREAM_W=1280                           # input screen width  (e.g. desktop width )
 STREAM_H=800                            # input screen height (e.g. desktop height)
 FPS=12                                  # target output FPS
@@ -127,7 +127,7 @@ STREAM_OUTPUT=$LIVE_OUTPUT     # one of FILE_OUTPUT , LIVE_OUTPUT
 
 # general a/v configuration
 [ ! -z "$TEXT_FILE"  ] && [ ! -f $TEXT_FILE ] && echo "$STREAM_TEXT" > $TEXT_FILE
-(($CAPTURE_AUDIO))     || (AUDIO_INPUT="" ; AUDIO_OUTPUT="")
+(($CAPTURE_AUDIO)) || (AUDIO_INPUT="" ; AUDIO_OUTPUT="")
 
 # user text configuration
 TEXT=": $FILE_TEXT"
