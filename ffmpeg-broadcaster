@@ -17,18 +17,22 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-THIS_NAME=`basename "$0"`
+THIS_NAME=$(basename "$0")
 USAGE="USAGE:
-    $THIS_NAME [ a_configuration [ once ] ]
+  $THIS_NAME [ a_configuration [ once ] ]
 
-    when called with no arguments the stream runs the default configuration, automatically
-        restarting after any exceptional event (device error , dropped connection , etc)
-    the optional \"a_configuration\" selects a particular configuration and is one of:
-        [ screen , screen+text , screen+cam , cam+text , all , break ]
-    the optional second argument 'once' disables automatic restarts
+  when called with no arguments the stream runs the default configuration, automatically
+      restarting after any exceptional event (device error , dropped connection , etc)
+  the optional \"a_configuration\" selects a particular configuration and is one of:
+      [ screen , screen+text , screen+cam , cam+text , all , break ]
+  the optional second argument 'once' disables automatic restarts
 
-    NOTE: \$RTMP_URL and \$STREAM_KEY must be defined either in this script or in the environment
-    NOTE: all configurations include audio - set CAPTURE_AUDIO to 0 to disable"
+  NOTE: \$RTMP_URL must be defined, either in this script or in the environment
+        example URLs for $RTMP_URL:
+          peertube:      rtmp://${PEERTUBE_HOST}:1935/live/${STREAM_KEY}
+          livecoding.tv: rtmp://usmedia3.livecoding.tv:1935/livecodingtv/${STREAM_KEY}
+
+  NOTE: all configurations include audio - set CAPTURE_AUDIO to 0 to disable"
 
 # the entries under the following headings are intended for per-user configuration:
 #   * user a/v params
@@ -49,39 +53,38 @@ USAGE="USAGE:
 
 
 # user a/v params
-HOST="lctv"                          # "lctv" | ""
-[ "$RTMP_URL"   ] || RTMP_URL=""     # destination URL if HOST="" (or define RTMP_URL in env  )
-[ "$STREAM_KEY" ] || STREAM_KEY=""   # your private stream key    (or define STREAM_KEY in env)
-SCREEN_W=1280                        # input screen width  (e.g. desktop width )
-SCREEN_H=800                         # input screen height (e.g. desktop height)
-SCREEN_N=':0.0'                      # display/screen number to capture (usually :0.0)
-CAM_LG_W=640                         # input screen width  (e.g. desktop width )
-CAM_LG_H=480                         # input screen height (e.g. desktop height)
-CAM_SM_W=160                         # input screen width  (e.g. desktop width )
-CAM_SM_H=120                         # input screen height (e.g. desktop height)
-CAM_DEV=/dev/video0                  # video device to grab (usually /dev/video0)
-STREAM_W=1280                        # input screen width  (e.g. desktop width )
-STREAM_H=800                         # input screen height (e.g. desktop height)
-FPS=12                               # target output FPS (12 is plenty for screen capture)
-GOP=$(($FPS*4))                      # i-frame interval
-CBR='1200k'                          # constant output bitrate (should be between 800k - 1300k)
-CAPTURE_AUDIO=1                      # set to 1 to capture audio - 0 to disable audio
-AUDIO_CHANNELS=2                     # number of channels
-AUDIO_SAMPLERATE=48000               # audio samplerate (22050 is plenty for voice)
-AUDIO_BITRATE='128k'                 # audio bitrate (64k per channel is plenty for voice)
-ALSA_DEVICE='hw:0'                   # ALSA plug device (usually hw:0)
-THREADS=0                            # 0 for auto - max 6
-QUALITY='ultrafast'                  # one of the many FFMPEG presets
-OUTPUT_FILE=./ffmpeg-broadcaster.flv # path for output file if STREAM_OUTPUT=$FILE_OUTPUT
-EXIT_CMD=''                          # optional commands to run if unexpectedly disconnected
+[[ -z "$RTMP_URL" ]] || RTMP_URL='' # destination URL (or define RTMP_URL in env)
+SCREEN_W=1280                       # input screen width  (e.g. desktop width )
+SCREEN_H=800                        # input screen height (e.g. desktop height)
+SCREEN_N=':0.0'                     # display/screen number to capture (usually :0.0)
+CAM_LG_W=640                        # input screen width  (e.g. desktop width )
+CAM_LG_H=480                        # input screen height (e.g. desktop height)
+CAM_SM_W=160                        # input screen width  (e.g. desktop width )
+CAM_SM_H=120                        # input screen height (e.g. desktop height)
+CAM_DEV=/dev/video0                 # video device to grab (usually /dev/video0)
+STREAM_W=1280                       # input screen width  (e.g. desktop width )
+STREAM_H=800                        # input screen height (e.g. desktop height)
+FPS=12                              # target output FPS (12 is plenty for screen capture)
+GOP=$(($FPS*4))                     # i-frame interval
+CBR='1200k'                         # constant output bitrate (should be between 800k - 1300k)
+CAPTURE_AUDIO=1                     # set to 1 to capture audio - 0 to disable audio
+AUDIO_CHANNELS=2                    # number of channels
+AUDIO_SAMPLERATE=48000              # audio samplerate (22050 is plenty for voice)
+AUDIO_BITRATE='128k'                # audio bitrate (64k per channel is plenty for voice)
+ALSA_DEVICE='hw:0'                  # ALSA plug device (usually hw:0)
+THREADS=0                           # 0 for auto - max 6
+QUALITY='ultrafast'                 # one of the many FFMPEG presets
+OUTPUT_DIR=$XDG_VIDEOS_DIR          # path for output files if STREAM_OUTPUT=$FILE_OUTPUT
+EXIT_CMD=''                         # optional commands to run if unexpectedly disconnected
 
 # user image params
-[ ! -z "$STREAM_IMG" ] || STREAM_IMG="" # fullscreen interstitial image (or define STREAM_IMG in env)
-[ ! -z "$LOGO_IMG"   ] || LOGO_IMG=""   # small overlay image           (or define LOGO_IMG in env)
+[[ -n "$STREAM_IMG" ]] || STREAM_IMG="" # fullscreen interstitial image (or define STREAM_IMG in env)
+[[ -n "$LOGO_IMG"   ]] || LOGO_IMG=""   # small overlay image           (or define LOGO_IMG in env)
 
 # user text params
-TEXT_FILE=/run/user/`id -u`/av-caster-text
-[ "$STREAM_TEXT" ] || STREAM_TEXT="" # initial overlay text (or define STREAM_TEXT in env)
+STORAGE_DIR=$HOME/.local/share/ffmpeg-broadcaster
+TEXT_FILE=$STORAGE_DIR/stream_text.txt
+[[ "$STREAM_TEXT" ]] || STREAM_TEXT="" # initial overlay text (or define STREAM_TEXT in env, or in $TEXT_FILE)
 FONT_FILE=/usr/share/fonts/truetype/tlwg/Purisa.ttf
 FONT_SIZE=48
 TEXT_BORDER_D=4
@@ -113,21 +116,17 @@ X264_OUTPUT="-vcodec libx264 -pix_fmt yuv420p -preset $QUALITY -s $STREAM_RES
              -g $GOP -vb $CBR -maxrate $CBR -bufsize $CBR"
 AAC_OUTPUT="-acodec aac -ar $AUDIO_SAMPLERATE -ab $AUDIO_BITRATE -strict experimental"
 THREADS="-threads $THREADS"
-case $HOST in
-   "lctv") RTMP_URL="$LCTV_RTMP_URL/$STREAM_KEY" ;;
-   *     ) STREAM_KEY="unused"                   ;;
-esac
-FILE_OUTPUT="-f flv $OUTPUT_FILE"
+FILE_OUTPUT="-f flv $OUTPUT_DIR/ffmpeg-broadcaster-$(date +%Y-%m-%d_%H-%M).flv"
 LIVE_OUTPUT="-f flv $RTMP_URL"
 
 # general image params
-[ "$SELECTED_CONFIGURATION" != "interstitial" ] && STREAM_IMG='unused'
+[[ "$SELECTED_CONFIGURATION" != "interstitial" ]] && STREAM_IMG='unused'
 
 # general text params
 FONT='fontfile='$FONT_FILE': fontsize='$FONT_SIZE': fontcolor='$TEXT_COLOR': shadowx='$TEXT_SHADOW_W' : shadowy='$TEXT_SHADOW_H
 TEXT_BG='box=1: boxcolor='$TEXT_BG_COLOR                                       # unused
 TEXT_BORDER='borderw='$TEXT_BORDER_D': bordercolor='$TEXT_BORDER_COLOR
-[ ! -z "$TEXT_FILE" ] && [ -f $TEXT_FILE ] && STREAM_TEXT=`cat $TEXT_FILE`
+[[ -f "$TEXT_FILE" ]] && STREAM_TEXT="$(cat $TEXT_FILE)"
 BLINK_TEXT_DURATION=$((${#STREAM_TEXT}/$TEXT_MARQUEE_SPEED))
 BLINK_TEXT=': enable=lt(mod(t\,'$BLINK_TEXT_PERIOD')\,'$BLINK_TEXT_DURATION')' # unused
 STATIC_TEXT='text='$STREAM_TEXT                                                # unused
@@ -145,14 +144,14 @@ LOGGING_VERBOSE=''
 # user a/v configuration
 OVERLAY_INPUT=$WEBCAM_INPUT_SM # one of $WEBCAM_INPUT_SM , $STATIC_INPUT_SM
 OVERLAY_POS=$OVERLAY_BR_POS    # one of $OVERLAY_TL_POS , $OVERLAY_BR_POS
-AUDIO_INPUT=$PULSE_INPUT       # one of $ALSA_INPUT , $PULSE_INPUT , $JACK_INPUT
+AUDIO_INPUT=$ALSA_INPUT        # one of $ALSA_INPUT , $PULSE_INPUT , $JACK_INPUT
 VIDEO_OUTPUT=$X264_OUTPUT      # only $X264_OUTPUT is defined (others are possible)
 AUDIO_OUTPUT=$AAC_OUTPUT       # only $AAC_OUTPUT  is defined (others are possible)
 STREAM_OUTPUT=$LIVE_OUTPUT     # one of $FILE_OUTPUT , $LIVE_OUTPUT
 
 # general a/v configuration
-[ ! -z "$TEXT_FILE"  ] && [ ! -f $TEXT_FILE ] && echo "$STREAM_TEXT" > $TEXT_FILE
-(($CAPTURE_AUDIO)) || (AUDIO_INPUT="" ; AUDIO_OUTPUT="")
+[[ ! -f "$TEXT_FILE" ]] && echo "$STREAM_TEXT" > $TEXT_FILE
+(($CAPTURE_AUDIO)) || AUDIO_INPUT="" AUDIO_OUTPUT=""
 
 # user text configuration
 TEXT=": $FILE_TEXT"
@@ -175,7 +174,6 @@ screenOnly()
          $LOGGING         \
          $STREAM_OUTPUT
   QUIT=$?
-echo "QUIT=$QUIT"
 }
 
 screenPlusText()
@@ -251,13 +249,17 @@ interstitial()
 
 launch()
 {
-  printf "\nstream started at `date`\n\n$QUIT_MSG" ;
+  printf "\nstream started at $(date)\n\n$QUIT_MSG"
   $SELECTED_CONFIGURATION
-  printf "\nstream ended at `date`\n\n" ;
+  printf "\nstream ended at $(date)\n\n"
 }
 
 
-### main entry ###
+## main entry ##
+
+# setup
+OUTPUT_DIR=${OUTPUT_DIR:-$HOME/Videos}
+mkdir -p $STORAGE_DIR $OUTPUT_DIR
 
 # swicth on configuration
 case $1 in
@@ -271,16 +273,15 @@ case $1 in
 esac
 
 # sanity checks
-[ -z "$RTMP_URL"   ] && echo "RTMP_URL undefined"   && exit
-[ -z "$STREAM_KEY" ] && echo "STREAM_KEY undefined" && exit
-[ -z "$STREAM_IMG" ] && echo "STREAM_IMG undefined" && exit
+[[ -z "$RTMP_URL"   ]] && echo "RTMP_URL undefined"   && exit
+[[ -z "$STREAM_IMG" ]] && echo "STREAM_IMG undefined" && exit
 
 # launch configuration once
 QUIT_MSG="press <q> to exit"
-if [ "$2" == 'once' ] ; then launch ; exit ; fi ;
+if [[ "$2" == 'once' ]] ; then launch ; exit ; fi ;
 
 # launch configuration indefinitely
 QUIT_MSG="press <q> to restart the stream - press <CTRL-c> to exit"
 # TODO: ffmpeg exits with 0 on server kick - need some way to trap this
 # while !(($QUIT)) ; do sleep 1 ; launch ; $EXIT_CMD ; done ;
-while ((1)) ; do sleep 1 ; launch ; $EXIT_CMD ; done ;
+while true ; do sleep 1 ; launch ; $EXIT_CMD ; done ;
